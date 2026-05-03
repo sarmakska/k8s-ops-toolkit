@@ -7,17 +7,19 @@ on:
     branches: [main]
 
 jobs:
-  helm-lint:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: azure/setup-helm@v4
         with:
-          version: 'latest'
+          version: v3.16.0
 
-      - name: Lint Helm charts
+      - name: Helm lint
         run: |
-          for chart in charts/*/; do
-            helm lint "$chart"
+          for chart in $(find . -name Chart.yaml -not -path '*/node_modules/*' -exec dirname {} \;); do
+            echo "Linting $chart"
+            helm lint "$chart" || exit 1
           done
+        shell: bash
