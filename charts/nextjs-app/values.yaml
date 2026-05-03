@@ -1,0 +1,50 @@
+replicas: 2
+
+image:
+  repository: ghcr.io/your-org/your-app
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  port: 3000
+
+ingress:
+  enabled: true
+  className: nginx
+  host: app.example.com
+  tls:
+    enabled: true
+    issuer: letsencrypt-prod
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  min: 2
+  max: 10
+  targetCPU: 70
+
+probes:
+  liveness:
+    path: /api/health
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readiness:
+    path: /api/health
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+env: []
+secretEnv: []
+
+monitoring:
+  enabled: true
+  prometheusServiceMonitor: true
+  metricsPath: /api/metrics
+  metricsPort: 3000
