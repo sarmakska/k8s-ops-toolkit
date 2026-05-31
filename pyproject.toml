@@ -1,0 +1,13 @@
+[project]
+name = "k8s-ops-toolkit-tests"
+version = "1.1.0"
+description = "End-to-end tests for the k8s-ops-toolkit Helm chart and manifests"
+requires-python = ">=3.12"
+dependencies = [
+    "pytest>=8.0",
+    "pyyaml>=6.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

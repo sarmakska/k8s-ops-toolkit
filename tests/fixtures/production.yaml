@@ -1,0 +1,48 @@
+# A representative production deployment: private image, three replicas,
+# real host, secret-backed env, monitoring on.
+replicas: 3
+
+image:
+  repository: ghcr.io/acme/web
+  tag: v2.3.1
+  pullSecrets:
+    - ghcr-creds
+
+ingress:
+  enabled: true
+  className: nginx
+  host: app.acme.example
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 32m
+  tls:
+    enabled: true
+    issuer: letsencrypt-prod
+
+env:
+  - name: NODE_ENV
+    value: production
+
+secretEnv:
+  - name: DATABASE_URL
+    secretName: web-secrets
+    key: database-url
+
+envFromSecret:
+  - web-runtime
+
+autoscaling:
+  enabled: true
+  min: 3
+  max: 20
+  targetCPU: 65
+
+pdb:
+  enabled: true
+  minAvailable: 2
+
+monitoring:
+  enabled: true
+  prometheusServiceMonitor: true
+  metricsPath: /api/metrics
+  serviceMonitorLabels:
+    release: monitoring
