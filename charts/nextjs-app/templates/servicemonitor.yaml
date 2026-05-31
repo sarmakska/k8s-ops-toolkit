@@ -4,14 +4,16 @@ kind: ServiceMonitor
 metadata:
   name: {{ .Release.Name }}
   labels:
-    app.kubernetes.io/name: {{ .Release.Name }}
-    app.kubernetes.io/managed-by: helm
+    {{- include "nextjs-app.labels" . | nindent 4 }}
+    {{- with .Values.monitoring.serviceMonitorLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ .Release.Name }}
+      {{- include "nextjs-app.selectorLabels" . | nindent 6 }}
   endpoints:
     - port: http
       path: {{ .Values.monitoring.metricsPath }}
-      interval: 30s
+      interval: {{ .Values.monitoring.interval }}
 {{- end }}

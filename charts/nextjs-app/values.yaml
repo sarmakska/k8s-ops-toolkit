@@ -4,6 +4,14 @@ image:
   repository: ghcr.io/your-org/your-app
   tag: latest
   pullPolicy: IfNotPresent
+  # Names of pre-existing image pull secrets for private registries.
+  pullSecrets: []
+
+# Rolling update tuning. The defaults keep capacity available during a
+# deploy while allowing one extra pod to come up before an old one goes.
+rollingUpdate:
+  maxSurge: 1
+  maxUnavailable: 0
 
 service:
   port: 3000
@@ -12,6 +20,8 @@ ingress:
   enabled: true
   className: nginx
   host: app.example.com
+  # Extra ingress annotations, for example proxy body size limits.
+  annotations: {}
   tls:
     enabled: true
     issuer: letsencrypt-prod
@@ -30,6 +40,28 @@ autoscaling:
   max: 10
   targetCPU: 70
 
+# Pod disruption budget keeps a floor of available replicas during
+# voluntary disruptions such as node drains.
+pdb:
+  enabled: true
+  minAvailable: 1
+
+# Pod and container security context. The defaults run the app as a
+# non-root user with a read-only root filesystem disabled, which is the
+# safe baseline for a standard Next.js image.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
 probes:
   liveness:
     path: /api/health
@@ -40,11 +72,20 @@ probes:
     initialDelaySeconds: 5
     periodSeconds: 5
 
+# Inline non-secret environment variables.
 env: []
+# Individual secret-backed environment variables, one Secret key each.
 secretEnv: []
+# Whole Secrets mounted as environment variables via envFrom.
+envFromSecret: []
 
 monitoring:
   enabled: true
   prometheusServiceMonitor: true
   metricsPath: /api/metrics
   metricsPort: 3000
+  interval: 30s
+  # Extra labels so a kube-prometheus-stack with a release selector picks
+  # up the ServiceMonitor. Set release to your monitoring release name.
+  serviceMonitorLabels:
+    release: monitoring

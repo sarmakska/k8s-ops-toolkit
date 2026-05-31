@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: {{ .Release.Name }}
   labels:
-    app.kubernetes.io/name: {{ .Release.Name }}
+    {{- include "nextjs-app.labels" . | nindent 4 }}
 spec:
   type: ClusterIP
   ports:
@@ -11,4 +11,4 @@ spec:
       targetPort: http
       name: http
   selector:
-    app.kubernetes.io/name: {{ .Release.Name }}
+    {{- include "nextjs-app.selectorLabels" . | nindent 4 }}
