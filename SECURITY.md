@@ -4,7 +4,7 @@
 
 If you have found a security issue in this project, please report it privately. Do not open a public GitHub issue.
 
-**Email:** sarma@sarmalinux.com
+**Email:** security@sarmalinux.com
 
 Please include:
 - A clear description of the issue
@@ -16,7 +16,15 @@ I respond to every report within 7 days. Confirmed issues are patched on `main` 
 
 ## Supported versions
 
-Only the latest commit on `main` receives security fixes. Pin to a tagged release if you need a stable version surface.
+Security fixes land on `main` and in the latest `1.x` chart release. Older
+chart majors are not patched. Pin to a tagged release if you need a stable
+surface, and track `main` for the current fixes.
+
+| Version | Supported |
+| --- | --- |
+| chart 1.1.x (latest) | yes |
+| chart 1.0.x | no, upgrade to 1.1.x |
+| < 1.0 | no |
 
 ## Scope
 
