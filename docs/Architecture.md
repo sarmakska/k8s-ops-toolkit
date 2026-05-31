@@ -1,81 +1,86 @@
 # Architecture
 
-The k8s-ops-toolkit is a Helm chart for Next.js apps plus an opinionated
-observability stack. Drop the chart on any Kubernetes cluster, run the
-install script, and you have ingress, TLS, metrics, logs, and alerts
-without writing yaml.
+The k8s-ops-toolkit is a Helm chart for Next.js apps plus an opinionated,
+version-pinned observability and cost stack. Drop the chart on any Kubernetes
+cluster, run the install script or sync the ArgoCD app-of-apps, and you have
+ingress, TLS, metrics, logs, alerts, and spend tracking without writing yaml.
 
 ## Layers
 
 ```mermaid
 flowchart TB
   subgraph App
-    A[Next.js Deployment] --> S[Service]
+    A[Next.js Deployment] --> S[Service :80]
     S --> I[Ingress nginx]
   end
   subgraph TLS
     CM[cert-manager] --> I
     LE[Let's Encrypt] --> CM
   end
-  subgraph Obs[Observability]
+  subgraph Obs[Observability and cost]
     P[Prometheus] --> A
-    L[Loki] --> A
-    PM[Promtail] --> L
+    PT[Promtail] --> L[Loki 3.x]
+    PT --> A
+    OC[OpenCost] --> P
     G[Grafana] --> P
     G --> L
     AM[Alertmanager] --> P
   end
   Internet --> I
   Ops[Operator] --> G
+  Argo[ArgoCD] -.reconciles.-> I
+  Argo -.reconciles.-> P
 ```
 
 ## Helm chart structure
 
 ```
 charts/nextjs-app/
-├── Chart.yaml
-├── values.yaml          # all the knobs in one place
-└── templates/
-    ├── deployment.yaml
-    ├── service.yaml
-    ├── ingress.yaml     # cert-manager annotations
-    ├── hpa.yaml         # CPU/memory autoscaler
-    ├── pdb.yaml         # pod disruption budget
-    ├── servicemonitor.yaml  # for Prometheus
-    └── _helpers.tpl
+  Chart.yaml
+  values.yaml              # all the knobs in one place
+  templates/
+    _helpers.tpl           # shared label and selector helpers
+    deployment.yaml        # rolling update, security context, env injection
+    service.yaml           # ClusterIP :80 -> container :3000
+    ingress.yaml           # cert-manager annotations, host routing
+    hpa.yaml               # CPU autoscaler, gated
+    pdb.yaml               # pod disruption budget, gated
+    servicemonitor.yaml    # Prometheus scrape, gated
 ```
 
-Every template is short. There is no umbrella chart, no library chart.
-You can read the whole thing in twenty minutes.
+Every template is short. There is no umbrella chart and no library chart. You
+can read the whole thing in twenty minutes. Labels and selectors come from
+`_helpers.tpl` so the selector stays stable across upgrades while the full
+label set carries chart and managed-by metadata.
 
-## Observability stack
+## Platform components
 
-The `scripts/install.sh` script bootstraps:
+Both `scripts/install.sh` and the ArgoCD app-of-apps under `gitops/argocd`
+install the same components at the same pinned versions:
 
-- **ingress-nginx** as the cluster ingress (LoadBalancer service)
-- **cert-manager** with a ClusterIssuer pointing at Let's Encrypt
-- **kube-prometheus-stack** (Prometheus + Grafana + Alertmanager + node exporters)
-- **Loki + Promtail** for logs
-- A handful of pre-baked Grafana dashboards (cluster, ingress, app)
-- Default Alertmanager rules: pod restart loop, ingress 5xx spike, certificate near expiry, disk pressure
+- ingress-nginx 4.12.1 as the cluster ingress (LoadBalancer service).
+- cert-manager v1.17.1 with a `letsencrypt-prod` ClusterIssuer.
+- kube-prometheus-stack 70.4.2 (Prometheus, Grafana, Alertmanager, node exporters, kube-state-metrics).
+- Loki 6.29.0 chart (Loki 3.x) in single-binary mode, with Promtail 6.16.6 shipping container stdout.
+- OpenCost 2.1.3 reading allocation data from the in-cluster Prometheus and writing cost metrics back.
 
-This is everything most Next.js production deployments actually need
-and nothing more.
+Pinning lives in one place in `install.sh` and is mirrored by the GitOps
+Applications. The test suite asserts the two stay in step.
 
 ## What is intentionally not here
 
-- A service mesh (Istio/Linkerd). For most Next.js apps, mesh complexity outweighs benefit.
-- Tempo/Jaeger for distributed tracing. Add if you need it; the pattern is straightforward.
+- A service mesh (Istio, Linkerd). For most Next.js apps, mesh complexity outweighs benefit.
+- Tempo or Jaeger for distributed tracing. Add it if you need it; the pattern is straightforward.
 - A custom operator. The chart is plain Helm.
 - Multi-tenant tooling. This is single-tenant by design.
 
 ## Where to extend
 
-- `values.yaml` exposes resource limits, replicas, env vars, secrets, custom annotations.
-- The Grafana dashboards are JSON in `manifests/grafana-dashboards/`. Edit, kubectl apply.
-- Alertmanager rules live in `manifests/prometheus-rules/`. Add your own and apply.
+- `values.yaml` exposes replicas, resource limits, env vars, secrets, ingress annotations, security context, and the rolling update strategy.
+- Grafana dashboards are JSON in `manifests/grafana-dashboards/`. Add one and run `scripts/load-dashboards.sh`, or let the GitOps sidecar import it.
+- Alertmanager rules live in `manifests/prometheus-rules/`. Add your own and `kubectl apply`.
 
 ## Sister repos
 
-- [terraform-stack](https://github.com/sarmakska/terraform-stack) provisions the cluster + DNS + R2/KV.
+- [terraform-stack](https://github.com/sarmakska/terraform-stack) provisions the cluster, DNS, and storage.
 - [agent-orchestrator](https://github.com/sarmakska/agent-orchestrator) uses this chart in its example deploys.

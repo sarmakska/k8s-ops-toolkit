@@ -1,4 +1,4 @@
-# k8s-ops-toolkit — whitepaper
+# k8s-ops-toolkit whitepaper
 
 ## Why this exists
 
@@ -23,9 +23,12 @@ We use a strict definition. Production-grade means:
 5. **Logs** centralised, queryable, retainable.
 6. **Health probes** that catch broken deploys.
 7. **Rolling updates** with maxSurge and maxUnavailable tuned correctly.
+8. **Cost visibility** so spend never surprises you.
 
 If any one of these is missing, you are not production-grade. The
-toolkit ensures none of them are.
+toolkit ensures none of them are. Cost visibility comes from OpenCost,
+which reads allocation data from the in-cluster Prometheus and feeds the
+bundled spend dashboard.
 
 ## Architecture decisions
 
@@ -58,10 +61,22 @@ Loki indexes labels, not log content. That is the cost optimisation:
 storage is cheap, indexing is expensive. For SME-scale log volumes
 (under 100GB/day), Loki is roughly an order of magnitude cheaper than
 Elasticsearch and the query experience inside Grafana is better than
-Kibana for most ops tasks.
+Kibana for most ops tasks. The toolkit pins Loki 3.x in single-binary
+mode with the TSDB schema, which is the simplest topology that still
+runs the current storage and query engine; you can switch to the simple
+scalable deployment mode when volumes grow.
 
 If your log volumes are above 1TB/day, Elasticsearch starts to win on
 ergonomics. We are not solving that case.
+
+### Why both a script and GitOps
+
+The install script is the fastest way to a working platform on a fresh
+cluster, and it is easy to read top to bottom. GitOps through an ArgoCD
+app-of-apps is the right answer once the platform is something you
+maintain: drift self-heals, changes go through pull requests, and the
+cluster state is whatever git says it is. Both install the same pinned
+component versions, and the test suite asserts the two never drift apart.
 
 ### Why no service mesh
 

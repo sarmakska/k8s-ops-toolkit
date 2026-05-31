@@ -4,12 +4,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Last commit](https://img.shields.io/github/last-commit/sarmakska/k8s-ops-toolkit)](https://github.com/sarmakska/k8s-ops-toolkit/commits/main)
 [![Top language](https://img.shields.io/github/languages/top/sarmakska/k8s-ops-toolkit)](https://github.com/sarmakska/k8s-ops-toolkit)
-[![Chart Version](https://img.shields.io/badge/chart-v1.0.0-0F1689?logo=helm&logoColor=white)](charts/nextjs-app/Chart.yaml)
+[![Chart Version](https://img.shields.io/badge/chart-v1.1.0-0F1689?logo=helm&logoColor=white)](charts/nextjs-app/Chart.yaml)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.31+-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io)
-[![Helm](https://img.shields.io/badge/Helm-3.16-0F1689?logo=helm&logoColor=white)](https://helm.sh)
+[![Helm](https://img.shields.io/badge/Helm-3.17-0F1689?logo=helm&logoColor=white)](https://helm.sh)
 [![Prometheus](https://img.shields.io/badge/Prometheus-monitoring-E6522C?logo=prometheus&logoColor=white)](https://prometheus.io)
 [![Grafana](https://img.shields.io/badge/Grafana-dashboards-F46800?logo=grafana&logoColor=white)](https://grafana.com)
-[![Loki](https://img.shields.io/badge/Loki-logs-F46800)](https://grafana.com/oss/loki/)
+[![Loki](https://img.shields.io/badge/Loki_3.x-logs-F46800)](https://grafana.com/oss/loki/)
+[![OpenCost](https://img.shields.io/badge/OpenCost-spend-2E7D32)](https://www.opencost.io)
+[![ArgoCD](https://img.shields.io/badge/ArgoCD-GitOps-EF7B4D?logo=argo&logoColor=white)](https://argo-cd.readthedocs.io)
 [![Open Source](https://img.shields.io/badge/Open_Source-%E2%9D%A4-red)](https://github.com/sarmakska/k8s-ops-toolkit)
 
 **Production-grade Helm bundles and observability for Next.js apps on Kubernetes.**
@@ -22,7 +24,7 @@ Built by [Sarma Linux](https://sarmalinux.com).
 
 Most teams reach for Kubernetes when they outgrow Vercel or want to cut costs. Then they spend two weeks configuring the same things everyone else configures: ingress, cert-manager, monitoring, logging, autoscaling, secrets.
 
-This toolkit is those things, ready to go. Drop your Next.js app into the chart, set the domain, install. Includes a full observability stack (Prometheus + Grafana + Loki + Alertmanager) preconfigured for the common Next.js failure modes.
+This toolkit is those things, ready to go. Drop your Next.js app into the chart, set the domain, install. It includes a full observability stack (Prometheus, Grafana, Loki 3.x, Alertmanager) preconfigured for the common Next.js failure modes, an OpenCost spend dashboard, and a GitOps path through ArgoCD when you want the platform reconciled from git rather than installed by hand.
 
 ## Architecture
 
@@ -30,21 +32,27 @@ This toolkit is those things, ready to go. Drop your Next.js app into the chart,
 graph TD
   Internet[Internet] -->|443| Ing[ingress-nginx]
   Cert[cert-manager + Let's Encrypt] -.TLS certs.-> Ing
-  Ing --> Svc[Next.js Service]
-  Svc --> Pods[Next.js Pods x N]
-  HPA[HorizontalPodAutoscaler] -.scales.-> Pods
+  Ing --> Svc[Next.js Service :80]
+  Svc --> Pods[Next.js Pods x N :3000]
+  HPA[HorizontalPodAutoscaler] -.scales on CPU.-> Pods
   Pods -->|/api/metrics| Prom[Prometheus]
-  Pods -->|stdout logs| Loki[Loki]
+  Pods -->|stdout| Promtail[Promtail] --> Loki[Loki 3.x]
+  OpenCost[OpenCost] --> Prom
   Prom --> Graf[Grafana]
   Loki --> Graf
   Prom --> AM[Alertmanager]
   AM --> Slack[Slack]
+  Argo[ArgoCD app-of-apps] -.reconciles.-> Ing
+  Argo -.reconciles.-> Prom
 ```
 
 ## What is in the box
 
-- `charts/nextjs-app`: Helm chart for any Next.js app (deployment, service, ingress, autoscaling, liveness/readiness probes, env and secret injection, Prometheus ServiceMonitor)
-- `scripts/install.sh`: one-shot install of the surrounding platform on a fresh cluster, namely ingress-nginx, cert-manager with a Let's Encrypt production issuer, kube-prometheus-stack (Prometheus + Grafana + Alertmanager) and Loki for logs, with an optional Slack webhook for alerting
+- `charts/nextjs-app`: Helm chart for any Next.js app. Deployment with a tuned rolling update strategy and hardened security context, ClusterIP service, ingress with cert-manager TLS, HorizontalPodAutoscaler, PodDisruptionBudget, liveness and readiness probes, inline and secret-backed environment injection, and a Prometheus ServiceMonitor.
+- `scripts/install.sh`: one-shot, version-pinned install of the surrounding platform on a fresh cluster. ingress-nginx, cert-manager with a Let's Encrypt production issuer, kube-prometheus-stack (Prometheus, Grafana, Alertmanager), Loki 3.x with Promtail for logs, and OpenCost for spend, with an optional Slack webhook for alerting.
+- `scripts/load-dashboards.sh`: loads the bundled Grafana dashboards into the cluster as sidecar ConfigMaps.
+- `manifests/`: the bundled Grafana dashboards (Next.js app, OpenCost spend), Prometheus alert rules, and the Alertmanager and Loki values files.
+- `gitops/argocd/`: an app-of-apps that reconciles the same pinned platform from git through ArgoCD, the alternative to the imperative installer.
 
 ## When to use this, and when not to
 
@@ -64,7 +72,7 @@ export KUBECONFIG=~/.kube/your-cluster.yaml
   --slack-webhook https://hooks.slack.com/...
 ```
 
-In about 8 minutes you have ingress, TLS, monitoring, logging, and alerting working.
+In about 8 minutes you have ingress, TLS, monitoring, logging, cost tracking, and alerting working. Every upstream chart version is pinned in `scripts/install.sh`, so the same command produces the same platform every time.
 
 ## Deploy a Next.js app
 
@@ -76,6 +84,16 @@ helm install my-app ./charts/nextjs-app \
   --set replicas=3
 ```
 
+## GitOps install (ArgoCD)
+
+Prefer to reconcile the platform from git rather than run a script? Point ArgoCD at the app-of-apps root once and it syncs the same pinned components and self-heals drift:
+
+```bash
+kubectl apply -n argocd -f gitops/argocd/root.yaml
+```
+
+The child Applications under `gitops/argocd/apps/` pin ingress-nginx, cert-manager, kube-prometheus-stack, Loki, Promtail, and OpenCost to the same versions as the installer.
+
 ## Documentation
 
 Full documentation lives in the [project wiki](https://github.com/sarmakska/k8s-ops-toolkit/wiki):
@@ -83,28 +101,49 @@ Full documentation lives in the [project wiki](https://github.com/sarmakska/k8s-
 - [Architecture](https://github.com/sarmakska/k8s-ops-toolkit/wiki/Architecture): how the components fit together
 - [Quick-Start](https://github.com/sarmakska/k8s-ops-toolkit/wiki/Quick-Start): install on a fresh cluster
 - [Helm-Chart](https://github.com/sarmakska/k8s-ops-toolkit/wiki/Helm-Chart): the `values.yaml` reference
-- [Observability](https://github.com/sarmakska/k8s-ops-toolkit/wiki/Observability): dashboards and how to extend them
+- [Observability](https://github.com/sarmakska/k8s-ops-toolkit/wiki/Observability): dashboards, cost tracking, and how to extend them
+- [GitOps](https://github.com/sarmakska/k8s-ops-toolkit/wiki/GitOps): reconcile the platform from git with ArgoCD
 
-Working example: deploy any container that serves on port 3000 and exposes `/api/health`, for example the upstream [`vercel/next.js` Docker sample](https://github.com/vercel/next.js/tree/canary/examples/with-docker), then point the chart at its image:
+Working example: build any container that serves on port 3000 and exposes `/api/health`, push it to a registry, then point the chart at the image:
 
 ```bash
 helm install demo ./charts/nextjs-app \
-  --set image.repository=ghcr.io/vercel/next.js-docker-example \
+  --set image.repository=ghcr.io/you/nextjs-demo \
   --set image.tag=latest \
   --set ingress.host=demo.example.com
 ```
 
+The `app/` router needs only a one-line health route to satisfy the probes:
+
+```typescript
+// app/api/health/route.ts
+export async function GET() {
+  return Response.json({ ok: true })
+}
+```
+
+## Tests
+
+The chart and the bundled manifests are covered by an end-to-end pytest suite that renders `charts/nextjs-app` with real Helm and asserts on the resulting Kubernetes objects (selectors match pods, the service targets the container port, TLS wiring is correct, optional objects are gated off), plus checks that the GitOps Applications and the installer pin matching chart versions.
+
+```bash
+uv pip install --system pytest pyyaml
+pytest -ra
+```
+
+CI runs `helm lint`, a template render of the chart and both fixtures, the pytest suite, dashboard JSON validation, and ShellCheck on every push and pull request.
+
 ## Roadmap
 
-- [x] Next.js Helm chart with probes, autoscaling, ingress
-- [x] Observability stack (Prom + Grafana + Loki + Alertmanager)
-- [x] cert-manager + ingress-nginx wired in via the install script
+- [x] Next.js Helm chart with probes, autoscaling, PDB, ingress, hardened security context
+- [x] Observability stack (Prometheus, Grafana, Loki 3.x, Alertmanager)
+- [x] cert-manager + ingress-nginx wired in via the version-pinned install script
+- [x] OpenCost spend dashboard
+- [x] GitOps install via ArgoCD app-of-apps
+- [x] End-to-end test suite that renders the chart and asserts on the objects
 - [ ] Disaster recovery scripts via Velero
-- [ ] Postgres operator integration (CrunchyData or Zalando)
-- [ ] Redis operator
-- [ ] Cilium-based eBPF observability layer
-- [ ] Karpenter autoscaling templates for AWS
-- [ ] ArgoCD app-of-apps pattern
+- [ ] HPA on custom metrics (requests per second from the ServiceMonitor)
+- [ ] ingress-nginx canary traffic split between two releases
 
 ## License
 
