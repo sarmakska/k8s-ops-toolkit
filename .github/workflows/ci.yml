@@ -14,7 +14,7 @@ jobs:
 
       - uses: azure/setup-helm@v5
         with:
-          version: v3.21.0
+          version: v3.17.1
 
       - name: Helm lint
         run: |
@@ -30,6 +30,65 @@ jobs:
             echo "Rendering $chart with default values"
             helm template release-test "$chart" >/dev/null || exit 1
           done
+        shell: bash
+
+      - name: Render chart fixtures
+        run: |
+          helm template web charts/nextjs-app -f tests/fixtures/production.yaml >/dev/null
+          helm template worker charts/nextjs-app -f tests/fixtures/minimal.yaml >/dev/null
+        shell: bash
+
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: azure/setup-helm@v5
+        with:
+          version: v3.17.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        run: uv python install 3.14
+
+      - name: Install test dependencies
+        run: uv pip install --system pytest pyyaml
+
+      - name: Run end-to-end tests
+        run: pytest -ra
+        shell: bash
+
+  manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate dashboard JSON
+        run: |
+          for f in manifests/grafana-dashboards/*.json; do
+            echo "Validating $f"
+            python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f" || exit 1
+          done
+        shell: bash
+
+      - name: Validate manifest and GitOps YAML
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 - <<'PY'
+          import glob, sys, yaml
+          paths = glob.glob('manifests/**/*.yaml', recursive=True)
+          paths += glob.glob('gitops/**/*.yaml', recursive=True)
+          bad = False
+          for p in paths:
+              try:
+                  list(yaml.safe_load_all(open(p)))
+              except Exception as exc:
+                  print(f"INVALID {p}: {exc}")
+                  bad = True
+          sys.exit(1 if bad else 0)
+          PY
         shell: bash
 
   scripts:
