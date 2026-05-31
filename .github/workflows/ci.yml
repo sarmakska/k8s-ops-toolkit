@@ -7,12 +7,12 @@ on:
     branches: [main]
 
 jobs:
-  lint:
+  helm:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
         with:
           version: v3.16.0
 
@@ -23,3 +23,29 @@ jobs:
             helm lint "$chart" || exit 1
           done
         shell: bash
+
+      - name: Helm template render (smoke test)
+        run: |
+          for chart in $(find . -name Chart.yaml -not -path '*/node_modules/*' -exec dirname {} \;); do
+            echo "Rendering $chart with default values"
+            helm template release-test "$chart" >/dev/null || exit 1
+          done
+        shell: bash
+
+  scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Shell syntax check
+        run: |
+          for script in $(find scripts -name '*.sh'); do
+            echo "Checking $script"
+            bash -n "$script" || exit 1
+          done
+        shell: bash
+
+      - name: ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: scripts
