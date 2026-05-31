@@ -1,6 +1,8 @@
 # k8s-ops-toolkit
 
+[![CI](https://github.com/sarmakska/k8s-ops-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/sarmakska/k8s-ops-toolkit/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Chart Version](https://img.shields.io/badge/chart-v1.0.0-0F1689?logo=helm&logoColor=white)](charts/nextjs-app/Chart.yaml)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.31+-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io)
 [![Helm](https://img.shields.io/badge/Helm-3.16-0F1689?logo=helm&logoColor=white)](https://helm.sh)
 [![Prometheus](https://img.shields.io/badge/Prometheus-monitoring-E6522C?logo=prometheus&logoColor=white)](https://prometheus.io)
@@ -24,32 +26,23 @@ This toolkit is those things, ready to go. Drop your Next.js app into the chart,
 
 ```mermaid
 graph TD
-  Internet[Internet] -->|443| Caddy[Caddy LB]
-  Caddy --> Ing[NGINX Ingress]
-  Ing --> Svc1[Next.js Service]
-  Ing --> Svc2[API Service]
-  Svc1 --> P1[Pods x N]
-  Svc2 --> P2[Pods x N]
-  P1 --> Prom[Prometheus]
-  P2 --> Prom
-  P1 --> Loki[Loki]
-  P2 --> Loki
+  Internet[Internet] -->|443| Ing[ingress-nginx]
+  Cert[cert-manager + Let's Encrypt] -.TLS certs.-> Ing
+  Ing --> Svc[Next.js Service]
+  Svc --> Pods[Next.js Pods x N]
+  HPA[HorizontalPodAutoscaler] -.scales.-> Pods
+  Pods -->|/api/metrics| Prom[Prometheus]
+  Pods -->|stdout logs| Loki[Loki]
   Prom --> Graf[Grafana]
   Loki --> Graf
   Prom --> AM[Alertmanager]
-  AM --> Slack
-  AM --> Pager
+  AM --> Slack[Slack]
 ```
 
 ## What is in the box
 
-- `charts/nextjs-app` — Helm chart for any Next.js app (probes, autoscaling, ingress, ConfigMap, Secret, ServiceMonitor)
-- `charts/observability` — Prometheus + Grafana + Loki + Alertmanager + 8 preconfigured dashboards
-- `manifests/cert-manager` — Let's Encrypt issuers for staging and production
-- `manifests/ingress-nginx` — NGINX ingress with sensible defaults
-- `scripts/install.sh` — one-shot install of everything on a fresh cluster
-- `scripts/upgrade.sh` — Helm upgrades with rollback safety
-- `scripts/disaster-recovery.sh` — backup + restore Velero workflows
+- `charts/nextjs-app` — Helm chart for any Next.js app (deployment, service, ingress, autoscaling, liveness/readiness probes, env and secret injection, Prometheus ServiceMonitor)
+- `scripts/install.sh` — one-shot install of the surrounding platform on a fresh cluster: ingress-nginx, cert-manager with a Let's Encrypt production issuer, kube-prometheus-stack (Prometheus + Grafana + Alertmanager) and Loki for logs, with an optional Slack webhook for alerting
 
 ## Quick start
 
@@ -75,12 +68,30 @@ helm install my-app ./charts/nextjs-app \
   --set replicas=3
 ```
 
+## Documentation
+
+Full documentation lives in the [project wiki](https://github.com/sarmakska/k8s-ops-toolkit/wiki):
+
+- [Architecture](https://github.com/sarmakska/k8s-ops-toolkit/wiki/Architecture) — how the components fit together
+- [Quick-Start](https://github.com/sarmakska/k8s-ops-toolkit/wiki/Quick-Start) — install on a fresh cluster
+- [Helm-Chart](https://github.com/sarmakska/k8s-ops-toolkit/wiki/Helm-Chart) — `values.yaml` reference
+- [Observability](https://github.com/sarmakska/k8s-ops-toolkit/wiki/Observability) — dashboards and how to extend them
+
+Working example: deploy any container that serves on port 3000 and exposes `/api/health`, for example the upstream [`vercel/next.js` Docker sample](https://github.com/vercel/next.js/tree/canary/examples/with-docker), then point the chart at its image:
+
+```bash
+helm install demo ./charts/nextjs-app \
+  --set image.repository=ghcr.io/vercel/next.js-docker-example \
+  --set image.tag=latest \
+  --set ingress.host=demo.example.com
+```
+
 ## Roadmap
 
 - [x] Next.js Helm chart with probes, autoscaling, ingress
 - [x] Observability stack (Prom + Grafana + Loki + Alertmanager)
-- [x] cert-manager + ingress-nginx manifests
-- [x] Disaster recovery scripts via Velero
+- [x] cert-manager + ingress-nginx wired in via the install script
+- [ ] Disaster recovery scripts via Velero
 - [ ] Postgres operator integration (CrunchyData or Zalando)
 - [ ] Redis operator
 - [ ] Cilium-based eBPF observability layer
