@@ -20,14 +20,22 @@ charts/*/Chart.lock
 node_modules/
 dist/
 build/
+.next/
+.vercel/
 
 # Python
 __pycache__/
 *.pyc
 .venv/
+.pytest_cache/
 
 # Rust / build output
 target/
+
+# Test and coverage output
+coverage/
+.coverage
+htmlcov/
 
 # OS / editor
 .DS_Store
