@@ -1,0 +1,75 @@
+{
+  "title": "OpenCost spend",
+  "uid": "k8s-ops-opencost",
+  "schemaVersion": 39,
+  "editable": true,
+  "tags": ["k8s-ops-toolkit", "cost", "opencost"],
+  "timezone": "browser",
+  "time": { "from": "now-7d", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(node_total_hourly_cost, namespace)",
+        "refresh": 2,
+        "includeAll": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Hourly cost by namespace",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(\n  sum(container_memory_allocation_bytes) by (namespace) / 1024 / 1024 / 1024 * on() group_left avg(node_ram_hourly_cost)\n  + sum(container_cpu_allocation) by (namespace) * on() group_left avg(node_cpu_hourly_cost)\n) by (namespace)",
+          "legendFormat": "{{namespace}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "CPU hourly cost",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "avg(node_cpu_hourly_cost)",
+          "legendFormat": "cpu"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "RAM hourly cost",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "avg(node_ram_hourly_cost)",
+          "legendFormat": "ram"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Persistent volume hourly cost",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 14 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(pv_hourly_cost)",
+          "legendFormat": "pv"
+        }
+      ]
+    }
+  ]
+}

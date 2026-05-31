@@ -1,0 +1,19 @@
+# Loki 3.x schema and storage configuration for the single-binary install.
+# The schema block cannot be expressed cleanly with helm --set, so it lives
+# here and is passed with -f. Kept in step with the GitOps Application at
+# gitops/argocd/apps/loki.yaml.
+loki:
+  schemaConfig:
+    configs:
+      - from: "2024-04-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: index_
+          period: 24h
+  limits_config:
+    retention_period: 168h
+  compactor:
+    retention_enabled: true
+    delete_request_store: filesystem

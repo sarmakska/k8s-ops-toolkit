@@ -1,0 +1,65 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: k8s-ops-toolkit-app-rules
+  namespace: monitoring
+  labels:
+    # kube-prometheus-stack selects rules carrying this release label by
+    # default. Match it to your monitoring release name.
+    release: monitoring
+    app.kubernetes.io/part-of: k8s-ops-toolkit
+spec:
+  groups:
+    - name: k8s-ops-toolkit.workload
+      rules:
+        - alert: KubePodCrashLooping
+          expr: |
+            increase(kube_pod_container_status_restarts_total[10m]) > 5
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping
+            description: The container has restarted more than five times in ten minutes.
+        - alert: KubePersistentVolumeFillingUp
+          expr: |
+            predict_linear(kubelet_volume_stats_available_bytes[6h], 6 * 3600) < 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: PersistentVolume {{ $labels.persistentvolumeclaim }} is filling up
+            description: The volume is predicted to run out of space within six hours.
+    - name: k8s-ops-toolkit.ingress
+      rules:
+        - alert: IngressNginxHigh5xxRate
+          expr: |
+            sum(rate(nginx_ingress_controller_requests{status=~"5.."}[5m]))
+              / sum(rate(nginx_ingress_controller_requests[5m])) > 0.05
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: ingress-nginx is returning more than 5 percent 5xx
+            description: Over the last five minutes more than five percent of requests returned a 5xx status.
+        - alert: IngressNginxHighLatency
+          expr: |
+            histogram_quantile(0.99,
+              sum(rate(nginx_ingress_controller_request_duration_seconds_bucket[5m])) by (le)) > 2
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: ingress-nginx p99 latency above 2 seconds
+            description: The 99th percentile request latency has been above two seconds for five minutes.
+    - name: k8s-ops-toolkit.certificates
+      rules:
+        - alert: CertManagerCertificateExpirySoon
+          expr: |
+            (certmanager_certificate_expiration_timestamp_seconds - time()) / 86400 < 14
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: Certificate {{ $labels.name }} expires in under 14 days
+            description: cert-manager has not yet renewed a certificate that expires within fourteen days.

@@ -1,0 +1,29 @@
+# Alertmanager receiver configuration for kube-prometheus-stack.
+# Apply with:
+#   helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+#     --namespace monitoring -f manifests/values-alertmanager.yaml
+#
+# The Slack webhook is read from a Kubernetes Secret rather than being
+# inlined, so it never lands in values or git. The install script creates
+# that Secret when you pass --slack-webhook.
+alertmanager:
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      receiver: ops-slack
+      group_by: [alertname, namespace]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+    receivers:
+      - name: ops-slack
+        slack_configs:
+          - api_url_file: /etc/alertmanager/secrets/alertmanager-slack/url
+            channel: "#ops-alerts"
+            send_resolved: true
+            title: '{{ template "slack.default.title" . }}'
+            text: '{{ template "slack.default.text" . }}'
+  alertmanagerSpec:
+    secrets:
+      - alertmanager-slack
