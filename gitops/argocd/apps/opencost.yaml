@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: opencost
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://opencost.github.io/opencost-helm-chart
+    chart: opencost
+    targetRevision: 2.1.3
+    helm:
+      values: |
+        # OpenCost reads allocation data from the in-cluster Prometheus that
+        # kube-prometheus-stack installs and writes cost metrics back to it.
+        opencost:
+          prometheus:
+            internal:
+              enabled: true
+              namespaceName: monitoring
+              serviceName: monitoring-kube-prometheus-prometheus
+              port: 9090
+          exporter:
+            # Expose a ServiceMonitor so cost metrics are scraped back into
+            # Prometheus and the bundled OpenCost dashboard can query them.
+            defaultClusterId: default-cluster
+          metrics:
+            serviceMonitor:
+              enabled: true
+              additionalLabels:
+                release: monitoring
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

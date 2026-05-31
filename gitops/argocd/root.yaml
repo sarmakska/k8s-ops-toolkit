@@ -1,0 +1,30 @@
+# App-of-apps root. Point ArgoCD at this single Application and it syncs
+# every child Application under gitops/argocd/apps. This is the GitOps
+# alternative to running scripts/install.sh imperatively.
+#
+#   kubectl apply -n argocd -f gitops/argocd/root.yaml
+#
+# Replace repoURL if you fork. The targetRevision tracks main; pin it to a
+# tag for a frozen platform.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: k8s-ops-toolkit
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/sarmakska/k8s-ops-toolkit.git
+    targetRevision: main
+    path: gitops/argocd/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
