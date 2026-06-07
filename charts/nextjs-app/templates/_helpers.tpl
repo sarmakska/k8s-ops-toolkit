@@ -17,3 +17,20 @@ strict subset of the common labels and never include version data.
 app.kubernetes.io/name: {{ .Release.Name }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
+
+{{/*
+Topology spread constraints. One constraint per configured topology key,
+each spreading this release's own pods (matched on the selector labels) as
+evenly as possible. maxSkew is fixed at 1 so the scheduler keeps replicas
+balanced across the failure domain.
+*/}}
+{{- define "nextjs-app.topologySpread" -}}
+{{- range .Values.scheduling.spread.topologyKeys }}
+- maxSkew: 1
+  topologyKey: {{ . }}
+  whenUnsatisfiable: {{ $.Values.scheduling.spread.whenUnsatisfiable }}
+  labelSelector:
+    matchLabels:
+      {{- include "nextjs-app.selectorLabels" $ | nindent 6 }}
+{{- end }}
+{{- end -}}

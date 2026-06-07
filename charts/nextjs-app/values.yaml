@@ -46,6 +46,30 @@ pdb:
   enabled: true
   minAvailable: 1
 
+# Scheduling controls. The default topology spread keeps replicas off the
+# same zone and node so a single zone or node failure cannot take the whole
+# app down, which is the resilience the PDB above assumes. Set spread.enabled
+# to false on a single-node cluster (kind, minikube) where the constraints
+# cannot be satisfied. nodeSelector, affinity and tolerations are passed
+# through verbatim when set.
+scheduling:
+  spread:
+    enabled: true
+    # ScheduleAnyway lets pods land even when a zone is full, rather than
+    # leaving them Pending. Flip to DoNotSchedule for hard isolation.
+    whenUnsatisfiable: ScheduleAnyway
+    # Topology keys to spread across, widest blast radius first.
+    topologyKeys:
+      - topology.kubernetes.io/zone
+      - kubernetes.io/hostname
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []
+
+# Seconds the kubelet waits for graceful shutdown before sending SIGKILL.
+# Next.js needs a short window to drain in-flight requests on a deploy.
+terminationGracePeriodSeconds: 30
+
 # Pod and container security context. The defaults run the app as a
 # non-root user with a read-only root filesystem disabled, which is the
 # safe baseline for a standard Next.js image.
