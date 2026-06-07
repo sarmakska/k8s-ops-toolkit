@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Last commit](https://img.shields.io/github/last-commit/sarmakska/k8s-ops-toolkit)](https://github.com/sarmakska/k8s-ops-toolkit/commits/main)
 [![Top language](https://img.shields.io/github/languages/top/sarmakska/k8s-ops-toolkit)](https://github.com/sarmakska/k8s-ops-toolkit)
-[![Chart Version](https://img.shields.io/badge/chart-v1.1.0-0F1689?logo=helm&logoColor=white)](charts/nextjs-app/Chart.yaml)
+[![Chart Version](https://img.shields.io/badge/chart-v1.2.0-0F1689?logo=helm&logoColor=white)](charts/nextjs-app/Chart.yaml)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.31+-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io)
 [![Helm](https://img.shields.io/badge/Helm-3.17-0F1689?logo=helm&logoColor=white)](https://helm.sh)
 [![Prometheus](https://img.shields.io/badge/Prometheus-monitoring-E6522C?logo=prometheus&logoColor=white)](https://prometheus.io)
@@ -48,7 +48,7 @@ graph TD
 
 ## What is in the box
 
-- `charts/nextjs-app`: Helm chart for any Next.js app. Deployment with a tuned rolling update strategy and hardened security context, ClusterIP service, ingress with cert-manager TLS, HorizontalPodAutoscaler, PodDisruptionBudget, liveness and readiness probes, inline and secret-backed environment injection, and a Prometheus ServiceMonitor.
+- `charts/nextjs-app`: Helm chart for any Next.js app. Deployment with a tuned rolling update strategy and hardened security context, zone-aware topology spread so a single zone or node failure cannot take the whole app down, optional nodeSelector, affinity and tolerations, a configurable graceful-shutdown window, ClusterIP service, ingress with cert-manager TLS, HorizontalPodAutoscaler, PodDisruptionBudget, liveness and readiness probes, inline and secret-backed environment injection, and a Prometheus ServiceMonitor.
 - `scripts/install.sh`: one-shot, version-pinned install of the surrounding platform on a fresh cluster. ingress-nginx, cert-manager with a Let's Encrypt production issuer, kube-prometheus-stack (Prometheus, Grafana, Alertmanager), Loki 3.x with Promtail for logs, and OpenCost for spend, with an optional Slack webhook for alerting.
 - `scripts/load-dashboards.sh`: loads the bundled Grafana dashboards into the cluster as sidecar ConfigMaps.
 - `manifests/`: the bundled Grafana dashboards (Next.js app, OpenCost spend), Prometheus alert rules, and the Alertmanager and Loki values files.
@@ -135,7 +135,7 @@ CI runs `helm lint`, a template render of the chart and both fixtures, the pytes
 
 ## Roadmap
 
-- [x] Next.js Helm chart with probes, autoscaling, PDB, ingress, hardened security context
+- [x] Next.js Helm chart with probes, autoscaling, PDB, ingress, hardened security context, zone-aware topology spread
 - [x] Observability stack (Prometheus, Grafana, Loki 3.x, Alertmanager)
 - [x] cert-manager + ingress-nginx wired in via the version-pinned install script
 - [x] OpenCost spend dashboard

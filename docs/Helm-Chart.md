@@ -56,6 +56,19 @@ pdb:
   enabled: true
   minAvailable: 1
 
+scheduling:
+  spread:
+    enabled: true                 # set false on single-node clusters
+    whenUnsatisfiable: ScheduleAnyway   # or DoNotSchedule for hard isolation
+    topologyKeys:
+      - topology.kubernetes.io/zone
+      - kubernetes.io/hostname
+  nodeSelector: {}                # passed through verbatim when set
+  affinity: {}
+  tolerations: []
+
+terminationGracePeriodSeconds: 30 # drain window before SIGKILL
+
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 1000
@@ -102,7 +115,7 @@ monitoring:
 
 | Template | Renders | Why |
 | --- | --- | --- |
-| `deployment.yaml` | The app | Rolling update strategy, readiness and liveness probes on `/api/health`, hardened pod and container security context, three env injection patterns |
+| `deployment.yaml` | The app | Rolling update strategy, readiness and liveness probes on `/api/health`, hardened pod and container security context, zone-aware topology spread with optional nodeSelector, affinity and tolerations, a configurable graceful-shutdown window, three env injection patterns |
 | `service.yaml` | ClusterIP | Publishes port 80 and targets the container port (3000 by default) |
 | `ingress.yaml` | nginx Ingress | TLS via cert-manager, host routing, extra annotations |
 | `hpa.yaml` | HorizontalPodAutoscaler | Optional, CPU based |
@@ -136,6 +149,46 @@ If you want Prometheus to scrape the app:
 The bundled Grafana "Next.js app" dashboard expects standard counters:
 `http_requests_total`, `http_request_duration_seconds_bucket`, plus the default
 Node.js process metrics.
+
+## Scheduling and resilience
+
+By default the chart spreads a release's pods across failure domains so a PDB
+that promises `minAvailable` replicas can actually be honoured. Each
+configured topology key becomes one `topologySpreadConstraint` with `maxSkew:
+1` and a label selector scoped to this release, widest blast radius first:
+zone, then host.
+
+```yaml
+scheduling:
+  spread:
+    enabled: true
+    whenUnsatisfiable: ScheduleAnyway
+    topologyKeys:
+      - topology.kubernetes.io/zone
+      - kubernetes.io/hostname
+```
+
+`ScheduleAnyway` is the safe default: when a zone is full the scheduler still
+places the pod rather than leaving it `Pending`. Switch to `DoNotSchedule` when
+you want hard isolation and would rather a pod wait than co-locate. On a
+single-node cluster (kind, minikube) set `scheduling.spread.enabled: false`,
+since the host-level constraint can never be satisfied.
+
+`scheduling.nodeSelector`, `scheduling.affinity`, and `scheduling.tolerations`
+are passed through verbatim and omitted entirely when left empty, so you can
+pin the app to a dedicated node pool without templating your own manifests:
+
+```bash
+helm install my-app charts/nextjs-app \
+  --set 'scheduling.nodeSelector.pool=web' \
+  --set 'scheduling.tolerations[0].key=dedicated' \
+  --set 'scheduling.tolerations[0].operator=Equal' \
+  --set 'scheduling.tolerations[0].value=web' \
+  --set 'scheduling.tolerations[0].effect=NoSchedule'
+```
+
+`terminationGracePeriodSeconds` (default 30) is the window the kubelet gives
+the pod to drain in-flight requests before sending SIGKILL on a rollout.
 
 ## Secrets
 

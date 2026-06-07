@@ -4,7 +4,19 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.2.0]
+
+### Added
+
+- Zone-aware scheduling on the `nextjs-app` chart. By default the Deployment carries `topologySpreadConstraints` that spread its replicas across `topology.kubernetes.io/zone` first, then `kubernetes.io/hostname`, with `maxSkew: 1` and a per-release label selector, so a single zone or node failure cannot take the whole app down. This is the resilience the PodDisruptionBudget already assumes. The spread is configurable under `scheduling.spread` (toggle, topology keys, and `ScheduleAnyway` versus `DoNotSchedule`) and falls back cleanly on single-node clusters.
+- Optional `scheduling.nodeSelector`, `scheduling.affinity`, and `scheduling.tolerations`, passed through verbatim when set and omitted entirely when empty, plus a configurable `terminationGracePeriodSeconds` (default 30) so Next.js can drain in-flight requests on a deploy.
+- Three end-to-end tests covering the default zone-and-host spread, the production fixture's narrowed hard-spread and toleration overrides, and the absence of optional scheduling keys when unset, taking the chart render suite to 16 tests.
+
+### Changed
+
+- Chart bumped to 1.2.0. The production test fixture now exercises a zone-only `DoNotSchedule` spread, a dedicated-node toleration, and a 45-second graceful-shutdown window.
+
+## [1.1.0]
 
 ### Added
 

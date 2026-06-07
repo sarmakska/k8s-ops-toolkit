@@ -5,7 +5,7 @@ that fit that posture.
 
 ## Now
 
-- Helm chart for Next.js apps with deployment, service, ingress, HPA, PDB, ServiceMonitor, and a hardened security context.
+- Helm chart for Next.js apps with deployment, service, ingress, HPA, PDB, ServiceMonitor, zone-aware topology spread, and a hardened security context.
 - Version-pinned bootstrap script for ingress-nginx, cert-manager, kube-prometheus-stack, Loki 3.x with Promtail, and OpenCost.
 - GitOps install through an ArgoCD app-of-apps that pins the same component versions.
 - Bundled Grafana dashboards: Next.js app and OpenCost spend.
